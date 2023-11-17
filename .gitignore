@@ -6,3 +6,4 @@ FPGA/simulation
 *.bsd
 *.rpt
 *.bak
+FPGA/greybox_tmp/cbx_args.txt
