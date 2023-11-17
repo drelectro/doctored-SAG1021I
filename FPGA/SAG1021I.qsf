@@ -127,4 +127,11 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k3_1
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k1_1
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k1_2
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k3_2
+set_global_assignment -name VERILOG_FILE DAC8581.v
+set_global_assignment -name VERILOG_FILE DAC904.v
+set_global_assignment -name VERILOG_FILE clocks.v
+set_global_assignment -name QIP_FILE CLK_125MHz.qip
+set_global_assignment -name VERILOG_FILE LED.v
+set_location_assignment PIN_A8 -to output_led
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to output_led
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -113,128 +113,6 @@ IOR7  = K4 - 2
 
 */
 
-module ready_LED (input clk, 
-						input state,
-						input flash,
-						output reg led);
-						
-	reg [31:0] counter;
-	
-	always@ (posedge clk)
-	begin
-		if (flash == 1)
-		begin
-			if (counter <= 2500000)
-				begin
-					counter <= counter +1; 
-				end
-			
-			else
-				begin
-					counter <= 0;
-					led <= ~led;
-				end
-		end
-		else 
-			begin
-				led <= ~state;
-			end
-	end
-	
-						
-endmodule
-
-module DAC8581 (
-    input wire clk,                // System clock
-    input wire reset,              // Reset signal
-    input wire [15:0] dac_data,    // New data input for updating the DAC
-    input wire load_new_data,      // Trigger to load new data
-    output reg SCLK,               // Serial Clock for DAC
-    output reg DIN,                // Serial Data Input for DAC
-    output reg CS                  // Chip Select for DAC
-);
-
-// SPI interface parameters
-parameter SCLK_FREQ = 1_000_000; // Adjust as per your system clock
-parameter CLOCK_DIV = 25_000_000 / (2 * SCLK_FREQ); // Adjust for your FPGA clock
-integer counter = 0;
-reg [15:0] data_to_send = 0; // Default initialization data
-reg [4:0] bit_index = 0; // DAC8581 is 16-bit
-
-// State machine for SPI
-reg [1:0] state = 0;
-parameter IDLE = 0, LOAD = 1, SEND_BIT = 2, WAIT = 3;
-
-always @(posedge clk) begin
-    if (reset) begin
-        // Reset logic
-        SCLK <= 0;
-        DIN <= 0;
-        CS <= 1;
-        state <= IDLE;
-        bit_index <= 0;
-        data_to_send <= 0; // Initial value
-    end else begin
-        case (state)
-            IDLE: begin
-                if (load_new_data) begin
-                    data_to_send <= dac_data; // Load new data
-                    CS <= 0; // Activate DAC
-                    state <= SEND_BIT;
-                end
-            end
-            SEND_BIT: begin
-                if (counter < CLOCK_DIV) begin
-                    counter <= counter + 1;
-                end else begin
-                    counter <= 0;
-                    SCLK <= ~SCLK;
-                    if (SCLK == 1) begin
-                        DIN <= data_to_send[15 - bit_index];
-                        bit_index <= bit_index + 1;
-                        if (bit_index == 15) begin
-                            state <= WAIT;
-                            CS <= 1; // Deactivate DAC
-                        end
-                    end
-                end
-            end
-            WAIT: begin
-                // Wait state or additional logic
-                state <= IDLE; // Return to IDLE to accept new data
-                bit_index <= 0;
-            end
-        endcase
-    end
-end
-
-endmodule
-
-module DAC8581_output_selector(output en, 
-										output s0,
-										output s1,
-										output s2);
-										
-	assign en = 0;
-	assign s0 = 1;
-	assign s1 = 0;
-	assign s2 = 0;
-										
-endmodule
-
-module DAC904 (input clk,
-					output dac904_clk,
-					output reg [13:0] dac904_data);
-
-	always @(negedge clk) begin
-		dac904_data <= dac904_data +1;
-		//dac904_data <= 14'h3FFF; // 680mV
-		//dac904_data <= 14'h0; // -370mV
-	end
-	
-	assign dac904_clk = clk;
-					
-endmodule	
 
 module relay_driver(input state,
 							output c1,
@@ -250,7 +128,7 @@ endmodule
 module SAG1021I (input clk, // 25MHz master clock
 
 						output ready_led,
-						//output reg output_led,
+						output output_led,
 						
 						output DAC8581_SCLK,
 						output DAC8581_DIN,
@@ -273,14 +151,21 @@ module SAG1021I (input clk, // 25MHz master clock
 						output k4_1,
 						output k4_2
 						);
-						
-	ready_LED rdy(clk, 1, 1, ready_led);
+
+	wire clk_125MHz;
+	//wire clk_125MHz_lock;
+	CLK_125MHz(0, clk, clk_125MHz);
+	
+	status_LED rdy_led(clk, 0, 0, ready_led); // Off
+	status_LED op_led(clk, 0, 1, output_led); // Flash
 	
 	DAC8581 aux_dac(clk, 0, 16'h7000, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	
 	DAC8581_output_selector aux_dac_selector(U11_en, U11_s0, U11_s1, U11_s2);
 	
-	DAC904 main_dac(clk, dac904_clk, dac904_data);
+	
+	
+	DAC904 main_dac(clk_125MHz, dac904_clk, dac904_data);
 	
 	relay_driver K4(1, k4_1, k4_2); // Output Enable
 	relay_driver K3(0, k3_1, k3_2); // High / Low level output
