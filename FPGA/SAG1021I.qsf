@@ -61,8 +61,6 @@ set_global_assignment -name EDA_OUTPUT_DATA_FORMAT BSDL -section_id eda_board_de
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_location_assignment PIN_E15 -to clk
-set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to clk
 set_location_assignment PIN_D4 -to ready_led
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ready_led
 set_location_assignment PIN_L1 -to dac904_clk
@@ -137,4 +135,45 @@ set_global_assignment -name QIP_FILE CLK_125MHz.qip
 set_global_assignment -name VERILOG_FILE LED.v
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name VERILOG_FILE fx2.v
+set_location_assignment PIN_D15 -to FX2_AS
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_AS
+set_location_assignment PIN_D16 -to FX2_DS
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_DS
+set_location_assignment PIN_N12 -to FX2_data[15]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[15]
+set_location_assignment PIN_P14 -to FX2_data[13]
+set_location_assignment PIN_N13 -to FX2_data[14]
+set_location_assignment PIN_N14 -to FX2_data[12]
+set_location_assignment PIN_P16 -to FX2_data[11]
+set_location_assignment PIN_R16 -to FX2_data[10]
+set_location_assignment PIN_P15 -to FX2_data[9]
+set_location_assignment PIN_N16 -to FX2_data[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[14]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[13]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[12]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[11]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[10]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[9]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[8]
+set_location_assignment PIN_A14 -to FX2_data[7]
+set_location_assignment PIN_A13 -to FX2_data[6]
+set_location_assignment PIN_A12 -to FX2_data[5]
+set_location_assignment PIN_A11 -to FX2_data[4]
+set_location_assignment PIN_B13 -to FX2_data[3]
+set_location_assignment PIN_B12 -to FX2_data[2]
+set_location_assignment PIN_B11 -to FX2_data[1]
+set_location_assignment PIN_B10 -to FX2_data[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data
+set_location_assignment PIN_E15 -to clk_25MHz
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to clk_25MHz
+set_location_assignment PIN_F14 -to FX2_nRDWR
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
