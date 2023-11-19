@@ -18,23 +18,23 @@ IOB16 = FX2_CTL0
 IOL13 = FX2_RDY0
 IOL14 = FX2_RDY1
 
-IOB10 = FX2_PB0
+IOB10 = FX2_PB0 D0
 IOB11 = FX2_PB1
 IOB12 = FX2_PB2
 IOB13 = FX2_PB3
 IOA11 = FX2_PB4
 IOA12 = FX2_PB5
 IOA13 = FX2_PB6
-IOA14 = FX2_PB7
+IOA14 = FX2_PB7 D7
 
-ION16 = FX2_PD0
+ION16 = FX2_PD0 D8
 IOP15 = FX2_PD1
 IOR16 = FX2_PD2
 IOP16 = FX2_PD3
 ION14 = FX2_PD4
 IOP14 = FX2_PD5
 ION13 = FX2_PD6
-ION12 = FX2_PD7
+ION12 = FX2_PD7 D15
 
 
 IOJ16 = FX2_PA2
@@ -44,10 +44,10 @@ IOK15 = FX2_PA5
 IOL16 = FX2_PA6
 IOL15 = FX2_PA7
 
-IOD15 = FX2_PC0
-IOD16 = FX2_PC1
-IOF14 = FX2_PC2
-IOF15 = FX2_PC3
+IOD15 = FX2_PC0 AS
+IOD16 = FX2_PC1 DS
+IOF14 = FX2_PC2 nRD/WR
+IOF15 = FX2_PC3 
 IOF16 = FX2_PC4
 
 
@@ -125,10 +125,19 @@ endmodule
 										
 
 
-module SAG1021I (input clk, // 25MHz master clock
+module SAG1021I (input clk_25MHz, // 25MHz master clock
 
 						output ready_led,
 						output output_led,
+						
+						output k1_1,
+						output k1_2,
+						output k2_1,
+						output k2_2,
+						output k3_1,
+						output k3_2,
+						output k4_1,
+						output k4_2,
 						
 						output DAC8581_SCLK,
 						output DAC8581_DIN,
@@ -142,30 +151,30 @@ module SAG1021I (input clk, // 25MHz master clock
 						output [13:0] dac904_data,
 						output dac904_clk,
 						
-						output k1_1,
-						output k1_2,
-						output k2_1,
-						output k2_2,
-						output k3_1,
-						output k3_2,
-						output k4_1,
-						output k4_2
+						inout [15:0] FX2_data,
+						input FX2_AS,
+						input FX2_DS,
+						input FX2_nRDWR
+						
 						);
 
 	wire clk_125MHz;
-	//wire clk_125MHz_lock;
-	CLK_125MHz(0, clk, clk_125MHz);
+	CLK_125MHz(0, clk_25MHz, clk_125MHz);
 	
-	status_LED rdy_led(clk, 0, 0, ready_led); // Off
-	status_LED op_led(clk, 0, 1, output_led); // Flash
+	status_LED rdy_led(clk_25MHz, 0, 0, ready_led); // Off
+	status_LED op_led(clk_25MHz, 0, 1, output_led); // Flash
 	
-	DAC8581 aux_dac(clk, 0, 16'h7000, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
+	wire [15:0] freq_control;
+	FX2 fx2 (FX2_data, FX2_AS, FX2_DS, FX2_nRDWR, freq_control);
+	
+	DAC8581 aux_dac(clk_25MHz, 0, 16'h7000, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	
 	DAC8581_output_selector aux_dac_selector(U11_en, U11_s0, U11_s1, U11_s2);
 	
-	
-	
-	DAC904 main_dac(clk_125MHz, dac904_clk, dac904_data);
+	wire [13:0] waveform_data; 
+	sine_wave_generator gen(clk_125MHz, freq_control, waveform_data);
+	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
+
 	
 	relay_driver K4(1, k4_1, k4_2); // Output Enable
 	relay_driver K3(0, k3_1, k3_2); // High / Low level output
