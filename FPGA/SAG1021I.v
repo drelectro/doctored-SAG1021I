@@ -210,7 +210,8 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	
 	
 	wire [13:0] waveform_data; 
-	sine_wave_generator gen(clk_125MHz, conf_1_reg[15:0], waveform_data);
+	//sine_wave_generator gen(clk_125MHz, conf_1_reg[15:0], waveform_data);
+	function_generator gen(clk_125MHz, mode_reg, amplitude_reg, offset_reg, conf_1_reg, conf_2_reg, conf_3_reg, waveform_data);
 	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
 	
 	status_LED rdy_led(clk_100Hz, control_reg[0], 0, ready_led); // 
@@ -219,6 +220,6 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	relay_driver K4(control_reg[1], k4_1, k4_2); // Output Enable
 	relay_driver K3(control_reg[2], k3_1, k3_2); // Enable output amplifier (x ?)
 	relay_driver K2(control_reg[3], k2_1, k2_2); // Enable output attenuator (/10 ?)
-	relay_driver K1(control_reg[4], k1_1, k1_2); // ??	
+	relay_driver K1(control_reg[4], k1_1, k1_2); // Enable ouput LPF	
 	
 endmodule	
