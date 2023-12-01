@@ -185,106 +185,6 @@ void handle_usb_setup(__xdata struct usb_req_setup *req) {
   STALL_EP0();
 }
 
-// Convert a hex digit to an integer.
-int hextoi(char *s){
-  int i = 0;
-  while(*s) {
-    i <<= 4;
-    if(*s >= '0' && *s <= '9')
-      i |= *s - '0';
-    else if(*s >= 'a' && *s <= 'f')
-      i |= *s - 'a' + 10;
-    else if(*s >= 'A' && *s <= 'F')
-      i |= *s - 'A' + 10;
-    else
-      return 0;
-    s++;
-  }
-  return i;
-}
-
-/*
- SDS2504X / EasyWaveX Reference  messages and responses
-
- *IDN?  "Siglent Technologies,SDS2504X Plus,SDS2PEEC6R0295,5.3.1.3.9R10."
- PROD? "PROD MODEL,SDS2000X+,BAND,5MHZ."
- IDN-SGLT-AWG?  "Siglent Technologies, , , , "
-
- C1:WVDT FREQ,1000,AMPL,2,OFST,0,PHASE,0,WVNM,wave1,LENGTH,32768,WAVEDATA,...
- C1:ARWV NAME,wave1
-
-
-*/
-
-
-uint16_t msg_length = 0;
-
-uint16_t process_scpi_command(char *cmd, char *resp){
-  //char *token = strtok(cmd, " ");
-
-  char *token = cmd;
-
-  if(strncmp(token, "*IDN?", 5) == 0){
-    // It seem EasyWaveX only cares about the contents of the model field, and SAG1021I is not a valid model.
-    // The rest can be anything.
-    sprintf(resp, "DrElectro,SAG1021,SN0,R0");
-    return strlen(resp);
-  }
-
-  if(strncmp(token, "PROD?", 5) == 0){
-    // It seem EasyWaveX doesn't much care about the contents of each field, just that they are present.
-    sprintf(resp, "PROD MODEL,SAG1021I,-,-");
-    return strlen(resp);
-  }
-
-  if(strncmp(token, "IDN-SGLT-AWG?", 12) == 0){
-    sprintf(resp, "Siglent Technologies, , , , ");
-    return strlen(resp);
-  }
-
-  return 0;
-}
-
-uint16_t process_usb_tmc_msg(__xdata struct usb_tmc_msg_header *msg) {
-
-  uint16_t resp_length = 0;
-
-  // Handle USBTMC_MSGID_DEV_DEP_MSG_OUT.
-  if(msg->bMsgID == USBTMC_MSGID_DEV_DEP_MSG_OUT) {
-    __xdata struct usb_tmc_msg_dev_dep_msg_out *msg_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_out *)(msg+1);
-    //toggle_busy_led();
-    msg_length = process_scpi_command((__xdata char *)(msg_hdr+1), (__xdata char *)scratch+64);
-    return 0;
-  }
-
-  // Handle USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN.
-  if(msg->bMsgID == USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN) {
-
-    __xdata struct usb_tmc_msg_header *msg_hdr = (__xdata struct usb_tmc_msg_header *)scratch;
-    __xdata struct usb_tmc_msg_dev_dep_msg_in *resp_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_in *)(msg_hdr+1);
-    __xdata uint8_t *resp_data = (uint8_t *)(resp_hdr+1);
-
-    msg_hdr->bMsgID = USBTMC_MSGID_DEV_DEP_MSG_IN;
-    msg_hdr->bTag = msg->bTag;
-    msg_hdr->bTagInverse = ~msg->bTag;
-    msg_hdr->bRsv = 0;
-
-    resp_hdr->dwTransferSize = msg_length;
-    resp_hdr->bTransferAttributes = USBTMC_EOM;
-    resp_hdr->bRsv[0] = 0;
-    resp_hdr->bRsv[1] = 0;
-    resp_hdr->bRsv[2] = 0;
-
-    xmemcpy(resp_data, scratch+64, msg_length);
-    resp_length = sizeof(struct usb_tmc_msg_header) + sizeof(struct usb_tmc_msg_dev_dep_msg_in) + msg_length;
-    msg_length = 0;
-    return resp_length;
-  }
-
-  return 0;
-}
-
-
 uint16_t get_FPGA_register(uint8_t reg){
   uint16_t value = 0;
 
@@ -338,6 +238,162 @@ void set_FPGA_register(uint8_t reg, uint16_t value){
   IOC = 0;
   OEB = 0;
   OED = 0;
+}
+
+// Convert a decimal, octal or hex formatted text string to an integer.
+int strtoi(char *s){
+  int i = 0;
+  int l = 0;
+  int base = 10;
+
+  while (isspace(*s)) s++; // Skip leading whitespace
+
+  if(*s == '0') {
+    s++;
+    if(*s == 'x' || *s == 'X') {
+      s++;
+      base = 16;
+    } else {
+      base = 8;
+    }
+  }
+
+  while(*s) {
+    l = i;
+    i *= base;
+    if (base == 8){
+      if(*s >= '0' && *s <= '7')
+        i += *s - '0';
+      else 
+        return l; // Terminate on invalid character
+    }
+    else if (base == 10){
+      if(*s >= '0' && *s <= '9')
+        i += *s - '0';
+      else 
+        return l; // Terminate on invalid character
+    }
+    else if (base == 16){
+      if(*s >= '0' && *s <= '9')
+        i += *s - '0';
+      else if(*s >= 'a' && *s <= 'f')
+        i += *s - 'a' + 10;
+      else if(*s >= 'A' && *s <= 'F')
+        i += *s - 'A' + 10;
+      else 
+        return l; // Terminate on invalid character
+    }
+    else 
+      return 0; // Should never get here
+    
+    s++;
+  }
+  return i;
+}
+
+
+
+/*
+ SDS2504X / EasyWaveX Reference  messages and responses
+
+ *IDN?  "Siglent Technologies,SDS2504X Plus,SDS2PEEC6R0295,5.3.1.3.9R10."
+ PROD? "PROD MODEL,SDS2000X+,BAND,5MHZ."
+ IDN-SGLT-AWG?  "Siglent Technologies, , , , "
+
+ C1:WVDT FREQ,1000,AMPL,2,OFST,0,PHASE,0,WVNM,wave1,LENGTH,32768,WAVEDATA,...
+ C1:ARWV NAME,wave1
+
+
+*/
+
+
+uint16_t msg_length = 0;
+
+uint16_t process_scpi_command(char *cmd, char *resp){
+  //char *token = strtok(cmd, " ");
+  //char *token = cmd;
+
+  if(strncmp(cmd, "*IDN?", 5) == 0){
+    // It seem EasyWaveX only cares about the contents of the model field, and SAG1021I is not a valid model.
+    // The rest can be anything.
+    sprintf(resp, "DrElectro,SAG1021,SN0,R0");
+    return strlen(resp);
+  }
+
+  if(strncmp(cmd, "PROD?", 5) == 0){
+    // It seem EasyWaveX doesn't much care about the contents of each field, just that they are present.
+    sprintf(resp, "PROD MODEL,SAG1021I,-,-");
+    return strlen(resp);
+  }
+
+  if(strncmp(cmd, "IDN-SGLT-AWG?", 12) == 0){
+    sprintf(resp, "Siglent Technologies, , , , ");
+    return strlen(resp);
+  }
+
+  if(strncmp(cmd, "SET ", 4) == 0){
+    char * token = strtok(cmd, " ");
+    token = strtok(NULL, ",");
+
+    uint16_t reg = strtoi(token);
+    token = strtok(NULL, ",");
+    uint16_t value = strtoi(token);
+
+    set_FPGA_register(reg, value);
+
+  }
+
+  if(strncmp(cmd, "GET ", 4) == 0){
+    char * token = strchr(cmd, ' ')+1;
+
+    uint16_t reg = strtoi(token);
+    uint16_t value = get_FPGA_register(reg);
+
+    sprintf(resp, "%04X", value);
+    //sprintf(resp, "cmd=%s tok=%s reg=%04X val=%04X", cmd, token, reg, value);
+    return strlen(resp);
+  }
+
+  return 0;
+}
+
+uint16_t process_usb_tmc_msg(__xdata struct usb_tmc_msg_header *msg) {
+
+  uint16_t resp_length = 0;
+
+  // Handle USBTMC_MSGID_DEV_DEP_MSG_OUT.
+  if(msg->bMsgID == USBTMC_MSGID_DEV_DEP_MSG_OUT) {
+    __xdata struct usb_tmc_msg_dev_dep_msg_out *msg_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_out *)(msg+1);
+    //toggle_busy_led();
+    msg_length = process_scpi_command((__xdata char *)(msg_hdr+1), (__xdata char *)scratch+64);
+    return 0;
+  }
+
+  // Handle USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN.
+  if(msg->bMsgID == USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN) {
+
+    __xdata struct usb_tmc_msg_header *msg_hdr = (__xdata struct usb_tmc_msg_header *)scratch;
+    __xdata struct usb_tmc_msg_dev_dep_msg_in *resp_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_in *)(msg_hdr+1);
+    __xdata uint8_t *resp_data = (uint8_t *)(resp_hdr+1);
+
+    msg_hdr->bMsgID = USBTMC_MSGID_DEV_DEP_MSG_IN;
+    msg_hdr->bTag = msg->bTag;
+    msg_hdr->bTagInverse = ~msg->bTag;
+    msg_hdr->bRsv = 0;
+
+    resp_hdr->dwTransferSize = msg_length;
+    resp_hdr->bTransferAttributes = USBTMC_EOM;
+    resp_hdr->bRsv[0] = 0;
+    resp_hdr->bRsv[1] = 0;
+    resp_hdr->bRsv[2] = 0;
+
+    xmemcpy(resp_data, scratch+64, msg_length);
+    resp_length = sizeof(struct usb_tmc_msg_header) + sizeof(struct usb_tmc_msg_dev_dep_msg_in) + msg_length;
+    msg_length = 0;
+    return resp_length;
+  }
+
+  return 0;
 }
 
 
@@ -409,6 +465,7 @@ int main() {
       if(length == 0 && !(EP2CS & _EMPTY)) {
         length = (EP2BCH << 8) | EP2BCL;
         //xmemcpy(scratch, EP2FIFOBUF, length);
+        EP2FIFOBUF[length] = 0; // Null terminate the request.
         resp_length = process_usb_tmc_msg((__xdata struct usb_tmc_msg_header *)EP2FIFOBUF);
         EP2BCL = 0;
 

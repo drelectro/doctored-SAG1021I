@@ -176,4 +176,20 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data
 set_location_assignment PIN_E15 -to clk_25MHz
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to clk_25MHz
 set_location_assignment PIN_F14 -to FX2_nRDWR
+set_global_assignment -name VERILOG_FILE ADC121S101.v
+set_location_assignment PIN_M9 -to ADC121S101_SCLK
+set_location_assignment PIN_K9 -to ADC121S101_CS
+set_location_assignment PIN_L9 -to ADC121S101_SDATA
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ADC121S101_CS
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ADC121S101_SCLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to ADC121S101_SDATA
+set_location_assignment PIN_T9 -to U13_en
+set_location_assignment PIN_R8 -to U13_s0
+set_location_assignment PIN_T8 -to U13_s1
+set_location_assignment PIN_R9 -to U13_s2
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_en
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_nRDWR
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s0
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s1
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s2
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

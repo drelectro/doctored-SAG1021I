@@ -91,12 +91,20 @@ IOR8  = U13 - S0
 IOT8  = U13 - S1
 IOR9  = U13 - S2
 
-
+ -- U15 ADC121S101
 IOK9  = U15 - CS
 IOL9  = U15 - SDATA
 IOM9  = U15 - SCLK
 
+-- U16 AUX I/O Driver
 
+IOT12 = AUX_IN_ENn
+IOR11 = AUX_IN
+IOR12 = AUX_OUT_ENn
+IOP11 = AUX_OUT
+
+
+-- Relay drivers
 
 IOP8  = K1 - 1
 IOM7  = K1 - 2
@@ -148,6 +156,15 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 						output U11_s1,
 						output U11_s2,
 						
+						output ADC121S101_SCLK,
+						output ADC121S101_CS,
+						input  ADC121S101_SDATA,
+						
+						output U13_en,
+						output U13_s0,
+						output U13_s1,
+						output U13_s2,
+						
 						output [13:0] dac904_data,
 						output dac904_clk,
 						
@@ -158,27 +175,50 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 						
 						);
 
+	// Set up clocks							
 	wire clk_125MHz;
-	CLK_125MHz(0, clk_25MHz, clk_125MHz);
+	CLK_125MHz clk_pll(0, clk_25MHz, clk_125MHz);
 	
-	status_LED rdy_led(clk_25MHz, 0, 0, ready_led); // Off
-	status_LED op_led(clk_25MHz, 0, 1, output_led); // Flash
+	wire clk_12_5MHz;
+	wire clk_100Hz;
+	clock_gen clk_div(clk_25MHz, clk_12_5MHz, clk_100Hz);
 	
-	wire [15:0] freq_control;
-	FX2 fx2 (FX2_data, FX2_AS, FX2_DS, FX2_nRDWR, freq_control);
 	
-	DAC8581 aux_dac(clk_25MHz, 0, 16'h7000, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	
+	//status_LED rdy_led(clk_25MHz, 0, 0, ready_led); // Off
+	status_LED op_led(clk_100Hz, 0, 1, output_led); // Flash output LED
+	
+	wire [15:0] control_reg; 		// Control register
+	wire [15:0] mode_reg; 			// Mode register
+	wire [15:0] amplitude_reg;	   // Amplitude register
+	wire [15:0] offset_reg;		   // Offset register
+	wire [31:0] conf_1_reg; 		// Configuration register 1 (frequency, High count, ...)
+	wire [31:0] conf_2_reg; 		// Configuration register 2 (Low count, ...)
+	wire [31:0] conf_3_reg; 		// Configuration register 2 (Cycle count, ...)
+	wire [15:0] aux_adc_reg;		// ADC Read register
+	
+	FX2 fx2 (FX2_data, FX2_AS, FX2_DS, FX2_nRDWR, 
+		control_reg, mode_reg, amplitude_reg, offset_reg,
+		conf_1_reg, conf_2_reg, conf_3_reg,
+		aux_adc_reg);
+	
+	DAC8581 aux_dac(clk_25MHz, 0, amplitude_reg, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	DAC8581_output_selector aux_dac_selector(U11_en, U11_s0, U11_s1, U11_s2);
 	
-	wire [13:0] waveform_data; 
-	sine_wave_generator gen(clk_125MHz, freq_control, waveform_data);
-	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
-
+	ADC121S101 aux_adc(clk_12_5MHz, 0, aux_adc_reg, ADC121S101_SCLK, ADC121S101_SDATA, ADC121S101_CS);
+	ADC121S101_input_selector aux_adc_selector(U13_en, U13_s0, U13_s1, U13_s2);	
 	
-	relay_driver K4(1, k4_1, k4_2); // Output Enable
-	relay_driver K3(0, k3_1, k3_2); // High / Low level output
-	//relay_driver K2(0, k2_1, k2_2); // ??
-	//relay_driver K1(0, k1_1, k1_2); // ??	
+	
+	wire [13:0] waveform_data; 
+	sine_wave_generator gen(clk_125MHz, conf_1_reg[15:0], waveform_data);
+	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
+	
+	status_LED rdy_led(clk_100Hz, control_reg[0], 0, ready_led); // 
+
+	/* If we conenct relay K4 to control_reg[0] the ouput glitches at zero crossing, but it's fine as follows, why? */
+	relay_driver K4(control_reg[1], k4_1, k4_2); // Output Enable
+	relay_driver K3(control_reg[2], k3_1, k3_2); // Enable output amplifier (x ?)
+	relay_driver K2(control_reg[3], k2_1, k2_2); // Enable output attenuator (/10 ?)
+	relay_driver K1(control_reg[4], k1_1, k1_2); // ??	
 	
 endmodule	
