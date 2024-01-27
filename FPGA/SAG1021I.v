@@ -121,18 +121,7 @@ IOR7  = K4 - 2
 
 */
 
-
-module relay_driver(input state,
-							output c1,
-							output c2);
-	
-	assign c1 = ~state;
-	assign c2 = state;
-								
-endmodule							
-										
-
-
+							
 module SAG1021I (input clk_25MHz, // 25MHz master clock
 
 						output ready_led,
@@ -165,6 +154,12 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 						output U13_s1,
 						output U13_s2,
 						
+						
+						output AUX_OUT_ENn,
+						output AUX_OUT,
+						output AUX_IN_ENn,
+						input  AUX_IN,
+						
 						output [13:0] dac904_data,
 						output dac904_clk,
 						
@@ -182,9 +177,7 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	wire clk_12_5MHz;
 	wire clk_100Hz;
 	clock_gen clk_div(clk_25MHz, clk_12_5MHz, clk_100Hz);
-	
-	
-	
+		
 	//status_LED rdy_led(clk_25MHz, 0, 0, ready_led); // Off
 	status_LED op_led(clk_100Hz, 0, 1, output_led); // Flash output LED
 	
@@ -197,10 +190,58 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	wire [31:0] conf_3_reg; 		// Configuration register 2 (Cycle count, ...)
 	wire [15:0] aux_adc_reg;		// ADC Read register
 	
+	reg  [15:0] wf_mem_addr_i;		// Waveform memory address register (WR)
+	wire [15:0] wf_mem_data_i;		// Waveform memory data register (WR)
+	wire wf_mem_clk_i;				// Waveform memory clock (WR)
+	
 	FX2 fx2 (FX2_data, FX2_AS, FX2_DS, FX2_nRDWR, 
 		control_reg, mode_reg, amplitude_reg, offset_reg,
 		conf_1_reg, conf_2_reg, conf_3_reg,
-		aux_adc_reg);
+		aux_adc_reg,
+		wf_mem_data_i,wf_mem_clk_i);
+		
+	// On chip memory
+	reg [13:0] wf_mem_addr_o;		// Waveform memory address register (RD)
+	wire [13:0] wf_mem_data_o;		// Waveform memory data register (RD)
+	
+	
+	always@ (posedge clk_125MHz)
+	begin
+		wf_mem_addr_o <= wf_mem_addr_o + 1;
+	end
+	
+	memory mem(wf_mem_data_i[13:0], wf_mem_addr_o, clk_125MHz,
+				  wf_mem_addr_i[14:0], wf_mem_clk_i, 1, wf_mem_data_o);
+	
+	//data,
+	//rdaddress,
+	//rdclock,
+	//wraddress,
+	//wrclock,
+	//wren,
+	//q);
+	
+	//data,
+	//inclock,
+	//outclock,
+	//rdaddress,
+	//wraddress,
+	//wren,
+	//q);
+	
+	always@ (negedge wf_mem_clk_i)
+	begin
+		wf_mem_addr_i <= wf_mem_addr_i + 1;
+	end
+	
+	// Aux IO
+	
+	assign AUX_IN_ENn = 1;
+	assign AUX_OUT_ENn = 0;
+	
+	assign AUX_OUT = wf_mem_addr_i[1];
+	
+	
 	
 	DAC8581 aux_dac(clk_25MHz, 0, amplitude_reg, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	DAC8581_output_selector aux_dac_selector(U11_en, U11_s0, U11_s1, U11_s2);
@@ -209,17 +250,22 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	ADC121S101_input_selector aux_adc_selector(U13_en, U13_s0, U13_s1, U13_s2);	
 	
 	
-	wire [13:0] waveform_data; 
+	wire [13:0] fg_data; 
 	//sine_wave_generator gen(clk_125MHz, conf_1_reg[15:0], waveform_data);
-	function_generator gen(clk_125MHz, mode_reg, amplitude_reg, offset_reg, conf_1_reg, conf_2_reg, conf_3_reg, waveform_data);
-	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
+	function_generator gen(clk_125MHz, mode_reg, amplitude_reg, offset_reg, conf_1_reg, conf_2_reg, conf_3_reg, fg_data);
+	
+	//wire [13:0] waveform_data;
+	//assign waveform_data = control_reg[15] ? wf_mem_data_o : fg_data;
+	//assign waveform_data = wf_mem_data_o;
+	//DAC904 main_dac(clk_125MHz, fg_data, dac904_clk, dac904_data);
+	DAC904 main_dac(clk_125MHz, wf_mem_data_o, dac904_clk, dac904_data);
 	
 	status_LED rdy_led(clk_100Hz, control_reg[0], 0, ready_led); // 
 
 	/* If we conenct relay K4 to control_reg[0] the ouput glitches at zero crossing, but it's fine as follows, why? */
-	relay_driver K4(control_reg[1], k4_1, k4_2); // Output Enable
-	relay_driver K3(control_reg[2], k3_1, k3_2); // Enable output amplifier (x ?)
-	relay_driver K2(control_reg[3], k2_1, k2_2); // Enable output attenuator (/10 ?)
-	relay_driver K1(control_reg[4], k1_1, k1_2); // Enable ouput LPF	
+	relay_driver K4(clk_100Hz, control_reg[1], k4_1, k4_2); // Output Enable
+	relay_driver K3(clk_100Hz, control_reg[2], k3_1, k3_2); // Enable output amplifier (x ?)
+	relay_driver K2(clk_100Hz, control_reg[3], k2_1, k2_2); // Enable output attenuator (/10 ?)
+	relay_driver K1(clk_100Hz, control_reg[4], k1_1, k1_2); // Enable ouput LPF	
 	
 endmodule	

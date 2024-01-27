@@ -126,16 +126,8 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k1_2
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to k3_2
 set_location_assignment PIN_A8 -to output_led
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to output_led
-set_global_assignment -name VERILOG_FILE sine_gen.v
-set_global_assignment -name VERILOG_FILE SAG1021I.v
-set_global_assignment -name VERILOG_FILE DAC8581.v
-set_global_assignment -name VERILOG_FILE DAC904.v
-set_global_assignment -name VERILOG_FILE clocks.v
-set_global_assignment -name QIP_FILE CLK_125MHz.qip
-set_global_assignment -name VERILOG_FILE LED.v
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name VERILOG_FILE fx2.v
 set_location_assignment PIN_D15 -to FX2_AS
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_AS
 set_location_assignment PIN_D16 -to FX2_DS
@@ -176,7 +168,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_data
 set_location_assignment PIN_E15 -to clk_25MHz
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to clk_25MHz
 set_location_assignment PIN_F14 -to FX2_nRDWR
-set_global_assignment -name VERILOG_FILE ADC121S101.v
 set_location_assignment PIN_M9 -to ADC121S101_SCLK
 set_location_assignment PIN_K9 -to ADC121S101_CS
 set_location_assignment PIN_L9 -to ADC121S101_SDATA
@@ -192,5 +183,24 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to FX2_nRDWR
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s0
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s1
 set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to U13_s2
+set_global_assignment -name VERILOG_FILE sine_gen.v
+set_global_assignment -name VERILOG_FILE SAG1021I.v
+set_global_assignment -name VERILOG_FILE DAC8581.v
+set_global_assignment -name VERILOG_FILE DAC904.v
+set_global_assignment -name VERILOG_FILE clocks.v
+set_global_assignment -name QIP_FILE CLK_125MHz.qip
+set_global_assignment -name VERILOG_FILE LED.v
+set_global_assignment -name VERILOG_FILE fx2.v
+set_global_assignment -name VERILOG_FILE ADC121S101.v
 set_global_assignment -name VERILOG_FILE function_generator.v
+set_global_assignment -name VERILOG_FILE relay_driver.v
+set_global_assignment -name QIP_FILE memory.qip
+set_location_assignment PIN_R11 -to AUX_IN
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to AUX_IN
+set_location_assignment PIN_P11 -to AUX_OUT
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to AUX_OUT
+set_location_assignment PIN_T12 -to AUX_IN_ENn
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to AUX_IN_ENn
+set_location_assignment PIN_R12 -to AUX_OUT_ENn
+set_instance_assignment -name IO_STANDARD "3.3-V LVCMOS" -to AUX_OUT_ENn
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

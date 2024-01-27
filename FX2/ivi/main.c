@@ -23,7 +23,7 @@ VISA Resource name: USB0::0xF4EC::0x1011::SDS2PEEC6R0295::INSTR
 #include <fx2lib.h>
 #include <fx2delay.h>
 #include <fx2usb.h>
-#include <usbcdc.h>
+//#include <usbcdc.h>
 #include <ctype.h>
 
 #include <stdio.h>
@@ -31,6 +31,7 @@ VISA Resource name: USB0::0xF4EC::0x1011::SDS2PEEC6R0295::INSTR
 #include <stdlib.h>
 
 #include "usb_tmc.h"
+#include "FX2LPSerial.h"
 
 
 #define BUSY_LED_PORT IOE
@@ -306,32 +307,178 @@ int strtoi(char *s){
 
 */
 
+/*
+ * Get the next parameter and value from a SCPI command string.
+ * Returns the total length of the parameter and value, or -1 if we reached the end of the string.
+ * 
+ */
+int getScpiParam(__xdata char *cmd, __xdata char **param, __xdata char **value){
+
+  *param = cmd;
+  *value = NULL;
+  int n = 0;
+
+  while (*cmd != 0)
+  {
+    if (*cmd == ','){
+      *cmd = 0;
+      if (*value == 0)
+        *value = cmd+1;
+      else  
+        return n;
+      *value = cmd+1;
+    }
+    cmd++;
+    n++;
+  } 
+
+  if (*value == NULL)
+    return -1;
+  else
+    return n;
+}
+void int16_to_hexstr(uint16_t value, char *str){
+  uint8_t nibble;
+  for (int i = 0; i < 4; i++){
+    nibble = (value >> (12 - i*4)) & 0xF;
+    if (nibble < 10)
+      *str++ = nibble + '0';
+    else
+      *str++ = nibble - 10 + 'A';
+  }
+  *str = 0;
+}
 
 uint16_t msg_length = 0;
 
-uint16_t process_scpi_command(char *cmd, char *resp){
-  //char *token = strtok(cmd, " ");
-  //char *token = cmd;
+uint16_t process_scpi_command(__xdata char *cmd, __xdata uint16_t len, __xdata uint32_t xfer_size, char *resp){
+
+  __xdata uint16_t resp_len = 0;
+  __xdata uint32_t bytes_processed = len - 12; // Header is 12 bytes 
+  uint16_t length = 0;
+
+  __xdata char* start = cmd;
+  __xdata char* param = NULL;
+  __xdata char* value = NULL;
+
+  int r;  
+
+  *(cmd + bytes_processed) = 0; // Null terminate the block
+
+  FX2LPSerial_XmitString("\r\nP: ");
+  FX2LPSerial_XmitHex4(len);
+  FX2LPSerial_XmitChar(' ');
+  FX2LPSerial_XmitHex4(xfer_size);
 
   if(strncmp(cmd, "*IDN?", 5) == 0){
     // It seem EasyWaveX only cares about the contents of the model field, and SAG1021I is not a valid model.
     // The rest can be anything.
-    sprintf(resp, "DrElectro,SAG1021,SN0,R0");
-    return strlen(resp);
+    strcpy(resp, "DrElectro,SAG1021,SN0,R0");
+    resp_len = strlen(resp);
   }
 
-  if(strncmp(cmd, "PROD?", 5) == 0){
+  else if(strncmp(cmd, "PROD?", 5) == 0){
     // It seem EasyWaveX doesn't much care about the contents of each field, just that they are present.
-    sprintf(resp, "PROD MODEL,SAG1021I,-,-");
-    return strlen(resp);
+    strcpy(resp, "PROD MODEL,SAG1021I,-,-");
+    resp_len = strlen(resp);
   }
 
-  if(strncmp(cmd, "IDN-SGLT-AWG?", 12) == 0){
-    sprintf(resp, "Siglent Technologies, , , , ");
-    return strlen(resp);
+  else if(strncmp(cmd, "IDN-SGLT-AWG?", 12) == 0){
+    strcpy(resp, "Siglent Technologies, , , , ");
+    resp_len = strlen(resp);
   }
 
-  if(strncmp(cmd, "SET ", 4) == 0){
+  /*
+   * C1:WVDT FREQ,1000,AMPL,2,OFST,0,PHASE,0,WVNM,wave1,LENGTH,32768,WAVEDATA,...
+   */
+  else if(strncmp(cmd, "C1:WVDT ", 8) == 0){
+    
+    cmd += 8;
+
+    do{
+      r = getScpiParam(cmd, &param, &value);
+      
+      // We ran out of characters, so wait for more.
+      if (r == -1){
+
+        r = bytes_processed - (cmd - start);  // Number of bytes left in the buffer
+        xmemcpy(scratch, cmd, r); // Copy the remaining bytes to the start of the scratch buffer
+
+        EP2BCL = 0; // rearm EP2OUT
+        while((EP2CS & _EMPTY));
+        length = (EP2BCH << 8) | EP2BCL;
+
+        /*
+        FX2LPSerial_XmitString("\r\n more: ");
+        FX2LPSerial_XmitString(" 0x");
+        FX2LPSerial_XmitHex2(r);
+        FX2LPSerial_XmitString(" 0x");
+        FX2LPSerial_XmitHex2(length);
+        */
+
+        bytes_processed += length;
+
+        cmd = (__xdata char *)scratch;
+        xmemcpy(cmd + r, EP2FIFOBUF, length);
+        //FX2LPSerial_XmitString("\r\n cmd: ");
+        //FX2LPSerial_XmitString(cmd);
+
+        length += r;
+        *(cmd + length) = 0; // Null terminate the block
+
+        r = getScpiParam(cmd, &param, &value);
+      }
+
+      cmd += r+1;
+
+      FX2LPSerial_XmitString("\r\n pv: ");
+      FX2LPSerial_XmitString(param);
+      FX2LPSerial_XmitChar(' ');
+      FX2LPSerial_XmitString(value);
+      //FX2LPSerial_XmitChar(' 0x');
+      //FX2LPSerial_XmitHex2(r);
+    }
+    while (r > 0 && strncmp(cmd, "WAVEDATA", 8) != 0);
+
+    if (r > 0){
+      cmd += 9;
+      FX2LPSerial_XmitString("\r\n WAVEDATA: ");
+
+      FX2LPSerial_XmitHex4(*cmd);
+      FX2LPSerial_XmitHex4(*cmd+2);
+    }
+
+    FX2LPSerial_XmitString("\n");
+
+    while (bytes_processed < xfer_size){
+  
+      EP2BCL = 0; // rearm EP2OUT
+      while((EP2CS & _EMPTY));
+      length = (EP2BCH << 8) | EP2BCL;
+
+      bytes_processed += length;
+
+      FX2LPSerial_XmitString("\r\n r: ");
+      FX2LPSerial_XmitHex4(length);
+      FX2LPSerial_XmitChar(' ');
+      FX2LPSerial_XmitHex4(bytes_processed);
+
+      for (int i = 0; i < length; i+=2){
+        //set_FPGA_register(10, EP2FIFOBUF[i]);
+      }
+
+    }
+
+    //sprintf (dbg, "cmd=%s tok=%s\r\n", cmd, token);
+    //FX2LPSerial_XmitString(dbg);
+
+    //token = strchr(token, ' ')+1;
+    //token = strchr(token, ' ')+1;
+
+  }
+
+
+  else if(strncmp(cmd, "SET ", 4) == 0){
     char * token = strtok(cmd, " ");
     token = strtok(NULL, ",");
 
@@ -343,34 +490,54 @@ uint16_t process_scpi_command(char *cmd, char *resp){
 
   }
 
-  if(strncmp(cmd, "GET ", 4) == 0){
+  else if(strncmp(cmd, "GET ", 4) == 0){
     char * token = strchr(cmd, ' ')+1;
 
     uint16_t reg = strtoi(token);
     uint16_t value = get_FPGA_register(reg);
 
-    sprintf(resp, "%04X", value);
-    //sprintf(resp, "cmd=%s tok=%s reg=%04X val=%04X", cmd, token, reg, value);
-    return strlen(resp);
+    int16_to_hexstr(value, resp);
+    resp_len = strlen(resp);
   }
 
-  return 0;
+  else {
+    //sprintf (dbg, "\r\nUnknown command=%s", cmd);
+    //FX2LPSerial_XmitString(dbg);
+  }
+
+  if (bytes_processed < xfer_size){
+    //sprintf (dbg, "\r\np %d x %d", bytes_processed, xfer_size);
+    //FX2LPSerial_XmitString(dbg);
+  }
+
+  return resp_len;
 }
 
-uint16_t process_usb_tmc_msg(__xdata struct usb_tmc_msg_header *msg) {
+uint16_t process_usb_tmc_msg(__xdata struct usb_tmc_msg_header *msg, uint16_t len) {
 
   uint16_t resp_length = 0;
+  //char * dbg = (__xdata char *)scratch+256;
 
   // Handle USBTMC_MSGID_DEV_DEP_MSG_OUT.
   if(msg->bMsgID == USBTMC_MSGID_DEV_DEP_MSG_OUT) {
     __xdata struct usb_tmc_msg_dev_dep_msg_out *msg_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_out *)(msg+1);
-    //toggle_busy_led();
-    msg_length = process_scpi_command((__xdata char *)(msg_hdr+1), (__xdata char *)scratch+64);
+   
+  
+    /*FX2LPSerial_XmitString("\r\nR: ");
+    FX2LPSerial_XmitHex4(len);
+    FX2LPSerial_XmitChar(' ');
+    FX2LPSerial_XmitHex8(msg_hdr->wTransferSize);
+    FX2LPSerial_XmitChar(' ');
+    FX2LPSerial_XmitHex2(msg_hdr->bmTransferAttributes);
+    FX2LPSerial_XmitChar(' ');*/
+
+
+    msg_length = process_scpi_command((__xdata char *)(msg_hdr+1), len, msg_hdr->wTransferSize, (__xdata char *)scratch+64);
     return 0;
   }
 
   // Handle USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN.
-  if(msg->bMsgID == USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN) {
+  else if(msg->bMsgID == USBTMC_MSGID_REQUEST_DEV_DEP_MSG_IN) {
 
     __xdata struct usb_tmc_msg_header *msg_hdr = (__xdata struct usb_tmc_msg_header *)scratch;
     __xdata struct usb_tmc_msg_dev_dep_msg_in *resp_hdr = (__xdata struct usb_tmc_msg_dev_dep_msg_in *)(msg_hdr+1);
@@ -393,6 +560,11 @@ uint16_t process_usb_tmc_msg(__xdata struct usb_tmc_msg_header *msg) {
     return resp_length;
   }
 
+  else {
+    //FX2LPSerial_XmitString("\r\nUnknown Message ID: ");
+    //FX2LPSerial_XmitHex8(msg->bMsgID);
+  }
+
   return 0;
 }
 
@@ -407,8 +579,14 @@ void isr_IBN() __interrupt {
 }
 
 int main() {
+
+  // Initialize the UART 
+  // This also sets the CPU clock to 48MHz
+  FX2LPSerial_Init();
+  FX2LPSerial_XmitString("Doctored SAG1021i !\r\n");
+
   // Run core at 48 MHz fCLK.
-  CPUCS = _CLKSPD1;
+  // CPUCS = _CLKSPD1;
 
   // Use newest chip features.
   REVCTL = _ENH_PKT|_DYN_OUT;
@@ -464,10 +642,15 @@ int main() {
       // On receive data from host
       if(length == 0 && !(EP2CS & _EMPTY)) {
         length = (EP2BCH << 8) | EP2BCL;
-        //xmemcpy(scratch, EP2FIFOBUF, length);
-        EP2FIFOBUF[length] = 0; // Null terminate the request.
-        resp_length = process_usb_tmc_msg((__xdata struct usb_tmc_msg_header *)EP2FIFOBUF);
-        EP2BCL = 0;
+        
+        //FX2LPSerial_XmitString("\r\nR: ");
+        //FX2LPSerial_XmitHex4(length);
+        //FX2LPSerial_XmitChar(' ');
+        //FX2LPSerial_XmitHex4(EP2CS);
+
+        //EP2FIFOBUF[length] = 0; // Null terminate the request.
+        resp_length = process_usb_tmc_msg((__xdata struct usb_tmc_msg_header *)EP2FIFOBUF, length);
+        EP2BCL = 0; // rearm EP2OUT
 
         length = 0;
       }
