@@ -221,14 +221,6 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	//wren,
 	//q);
 	
-	//data,
-	//inclock,
-	//outclock,
-	//rdaddress,
-	//wraddress,
-	//wren,
-	//q);
-	
 	always@ (negedge wf_mem_clk_i)
 	begin
 		wf_mem_addr_i <= wf_mem_addr_i + 1;
@@ -242,7 +234,6 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	assign AUX_OUT = wf_mem_addr_i[1];
 	
 	
-	
 	DAC8581 aux_dac(clk_25MHz, 0, amplitude_reg, 1, DAC8581_SCLK, DAC8581_DIN, DAC8581_CS);
 	DAC8581_output_selector aux_dac_selector(U11_en, U11_s0, U11_s1, U11_s2);
 	
@@ -254,11 +245,9 @@ module SAG1021I (input clk_25MHz, // 25MHz master clock
 	//sine_wave_generator gen(clk_125MHz, conf_1_reg[15:0], waveform_data);
 	function_generator gen(clk_125MHz, mode_reg, amplitude_reg, offset_reg, conf_1_reg, conf_2_reg, conf_3_reg, fg_data);
 	
-	//wire [13:0] waveform_data;
-	//assign waveform_data = control_reg[15] ? wf_mem_data_o : fg_data;
-	//assign waveform_data = wf_mem_data_o;
-	//DAC904 main_dac(clk_125MHz, fg_data, dac904_clk, dac904_data);
-	DAC904 main_dac(clk_125MHz, wf_mem_data_o, dac904_clk, dac904_data);
+	wire [13:0] waveform_data;
+	assign waveform_data = control_reg[15] ? wf_mem_data_o : fg_data;
+	DAC904 main_dac(clk_125MHz, waveform_data, dac904_clk, dac904_data);
 	
 	status_LED rdy_led(clk_100Hz, control_reg[0], 0, ready_led); // 
 
